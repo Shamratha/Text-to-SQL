@@ -1,9 +1,9 @@
 # Text2SQL — Natural Language SQL Interface with Guardrails & Hallucination Detection
 
 Ask questions in plain English against a real analytical database. The system
-generates SQL with Claude, refuses to run anything destructive, verifies the
-query actually answers the question asked, and attaches an evidence-based
-confidence score to every result.
+generates SQL with an LLM (Groq Llama 3.3 70B free tier, or Claude), refuses to
+run anything destructive, verifies the query actually answers the question
+asked, and attaches an evidence-based confidence score to every result.
 
 **Measured eval results** (golden dataset, Groq `llama-3.3-70b-versatile`):
 
@@ -129,7 +129,7 @@ and a battery of dangerous SQL that must be blocked.
 ```
 app/
   main.py            FastAPI service + pipeline orchestration
-  llm.py             Claude calls (generation, back-translation, judging)
+  llm.py             provider-abstracted LLM calls (generation, back-translation, judging)
   guardrails.py      SQL-AST safety middleware
   executor.py        read-only sandboxed execution
   validation.py      sanity checks, agreement, confidence scoring
