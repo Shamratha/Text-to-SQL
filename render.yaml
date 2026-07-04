@@ -14,7 +14,12 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false          # set in the Render dashboard, never in git
+      # 8b-instant is the live-demo default: it has a much larger free-tier daily
+      # token quota than 70b (which caps at 100k tok/day and 429s the demo). 70b
+      # stays the primary model for the README eval numbers. NOTE: this value is
+      # blueprint-managed and re-synced on every deploy, so it must live here — a
+      # dashboard-only change gets reverted on the next deploy.
       - key: TEXT2SQL_MODEL
-        value: llama-3.3-70b-versatile
+        value: llama-3.1-8b-instant
       - key: PYTHON_VERSION
         value: "3.11"
