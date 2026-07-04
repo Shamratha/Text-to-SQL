@@ -17,9 +17,34 @@ DANGEROUS = [
     "INSERT INTO customers VALUES (1,'a','b','c','d','2025-01-01')",
     "CREATE TABLE t AS SELECT 1",
     "ALTER TABLE customers ADD COLUMN hacked INT",
+    "TRUNCATE customers",
     "SELECT 1; DROP TABLE customers",
     "SELECT * FROM read_csv('secrets.csv')",
     "SELECT * FROM read_parquet('x.parquet')",
+]
+
+# Adversarial patterns: smuggling, obfuscation, hidden writes, admin/exfil, info leak
+ADVERSARIAL = [
+    # multi-statement smuggling (incl. trailing-comment variants)
+    "SELECT * FROM customers WHERE name = 'x'; DELETE FROM orders; --",
+    "SELECT a FROM t UNION ALL SELECT b FROM u; DROP TABLE customers",
+    # comment-inside-keyword and case obfuscation
+    "DROP/*x*/TABLE customers",
+    "DrOp TaBlE customers",
+    # write hidden inside a CTE
+    "WITH x AS (DELETE FROM orders RETURNING *) SELECT * FROM x",
+    # admin / config / extension loading
+    "ATTACH 'evil.db' AS evil",
+    "PRAGMA database_list",
+    "SET memory_limit='1TB'",
+    "INSTALL httpfs",
+    "LOAD httpfs",
+    # exfiltration
+    "COPY customers TO 'exfil.csv'",
+    # information disclosure (config, and — critically — stored secrets)
+    "SELECT * FROM duckdb_secrets()",
+    "SELECT * FROM duckdb_settings()",
+    "SELECT getenv('PATH')",
 ]
 
 
@@ -28,6 +53,28 @@ def test_dangerous_sql_blocked(sql):
     result = guardrails.check(sql)
     assert not result.allowed, f"should have blocked: {sql}"
     assert result.violations
+
+
+@pytest.mark.parametrize("sql", ADVERSARIAL)
+def test_adversarial_sql_blocked(sql):
+    result = guardrails.check(sql)
+    assert not result.allowed, f"adversarial input slipped through: {sql}"
+    assert result.violations
+
+
+def test_comment_smuggled_drop_is_inert_not_executed():
+    """A DROP after a comment marker is parsed as an inert comment, not a second
+    statement — allowed, but the DROP is a comment node and never a statement."""
+    import sqlglot
+    from sqlglot import exp
+
+    result = guardrails.check("SELECT * FROM customers -- ; DROP TABLE customers")
+    assert result.allowed
+    # Re-parse the emitted SQL: exactly one statement, a SELECT, with no DROP node.
+    statements = sqlglot.parse(result.sql, read="duckdb")
+    assert len(statements) == 1
+    assert isinstance(statements[0], exp.Select)
+    assert statements[0].find(exp.Drop) is None  # DROP survives only as a comment
 
 
 def test_plain_select_allowed():

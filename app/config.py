@@ -16,9 +16,16 @@ class GuardrailConfig:
     default_row_limit: int = int(os.getenv("TEXT2SQL_ROW_LIMIT", "1000"))
     query_timeout_s: float = float(os.getenv("TEXT2SQL_QUERY_TIMEOUT_S", "10"))
     blocked_functions: frozenset = field(default_factory=lambda: frozenset({
+        # file / blob readers (data exfiltration)
         "read_csv", "read_csv_auto", "read_parquet", "read_json", "read_json_auto",
         "read_json_objects", "glob", "sniff_csv", "read_text", "read_blob",
+        # environment / settings (info disclosure)
         "getenv", "current_setting",
+        # DuckDB introspection table functions (config, paths, and — critically —
+        # stored secrets/credentials leakage)
+        "duckdb_settings", "duckdb_databases", "duckdb_secrets", "duckdb_extensions",
+        "duckdb_functions", "duckdb_logs", "pragma_database_list", "pragma_table_info",
+        "sql_auto_complete",
     }))
 
 
