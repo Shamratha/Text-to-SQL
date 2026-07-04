@@ -7,3 +7,4 @@ pydantic>=2.7
 python-dotenv>=1.0
 pytest>=8.0
 openai>=1.40
+pytest-cov>=5.0

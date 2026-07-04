@@ -253,7 +253,8 @@ python eval/run_eval.py --offline   # 25 dangerous/adversarial + 3 transforms, n
 python eval/run_eval.py             # + LLM: execution accuracy (with 95% CI),
                                     #   clarification, NL-injection defense, per-case report
 python eval/run_eval.py --only nl_injection   # just the LLM-layer jailbreak probes
-python -m pytest tests -q           # 36 unit tests (guardrails + adversarial + sandbox)
+python -m pytest tests -q                          # 62 unit tests
+python -m pytest tests --cov=app --cov-report=term # with coverage
 ```
 
 The golden dataset (`eval/golden.json`, **82 cases**) covers: 40 golden-SQL cases
@@ -265,6 +266,24 @@ disclosure), and 3 LIMIT-transform. Execution accuracy is reported with an exact
 Clopper–Pearson 95% binomial confidence interval (`clopper_pearson()` in
 `run_eval.py`, no scipy dependency) so small-N results carry explicit uncertainty
 bounds rather than a bare point estimate.
+
+**Test suite: 62 tests, 49% line coverage of `app/`** — deliberately concentrated
+on the correctness- and safety-critical code rather than spread thin:
+
+| Module | Coverage | Tested by |
+|---|---|---|
+| `guardrails.py` (the safety layer) | **96%** | unit tests (dangerous + adversarial battery) |
+| `validation.py` (confidence, sanity, agreement) | **95%** | unit tests (pure logic) |
+| `config.py` | **94%** | unit tests |
+| `executor.py` (read-only sandbox) | **88%** | unit tests |
+| `run_eval.py::clopper_pearson` | ✓ | unit tests (vs. closed-form + R reference) |
+| `main.py` (FastAPI orchestration) | 0% (unit) | live browser verification + the 82-case eval |
+| `schema_extract.py`, LLM-call paths in `llm.py` | low (unit) | the eval suite (they need a live DB / API) |
+
+The overall 49% is honest: the FastAPI wiring and the LLM-call paths are exercised
+end-to-end by the eval and live testing rather than by mocked unit tests, so their
+unit coverage is low by design. The parts where a bug would be *dangerous* or
+*silent* — guardrails, sandbox, confidence math — are 88–96%.
 
 ## Project layout
 
