@@ -6,3 +6,4 @@ anthropic>=0.95
 pydantic>=2.7
 python-dotenv>=1.0
 pytest>=8.0
+openai>=1.40

@@ -6,7 +6,6 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
-import anthropic
 import duckdb
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -97,17 +96,10 @@ def query(req: QueryRequest):
     # ---- 1. Generate SQL (structured output) --------------------------------
     try:
         gen = llm.generate_sql(req.question, schema_md)
-    except anthropic.AuthenticationError:
-        raise HTTPException(502, "Anthropic API key missing or invalid — set ANTHROPIC_API_KEY in .env")
-    except anthropic.APIStatusError as e:
-        raise HTTPException(502, f"LLM error ({e.status_code}): {e.message}")
-    except anthropic.APIConnectionError:
-        raise HTTPException(502, "Could not reach the Anthropic API — check your network")
-    except TypeError as e:
-        # The SDK raises a bare TypeError when no credentials resolve at all
-        if "authentication" in str(e).lower():
-            raise HTTPException(502, "No Anthropic API key configured — set ANTHROPIC_API_KEY in .env and restart")
-        raise
+    except llm.LLMAuthError as e:
+        raise HTTPException(502, f"{e} — set the API key in .env and restart")
+    except llm.LLMError as e:
+        raise HTTPException(502, str(e))
 
     if gen.needs_clarification:
         record = {
@@ -148,7 +140,7 @@ def query(req: QueryRequest):
         judgment = llm.judge_alignment(req.question, back_translated)
         alignment_score = judgment.score
         alignment_reasoning = judgment.reasoning
-    except (anthropic.APIError, TypeError) as e:
+    except llm.LLMError as e:
         logger.warning("Back-translation skipped: %s", e)
 
     sanity = validation.sanity_check(result, state["date_range"])
@@ -168,7 +160,7 @@ def query(req: QueryRequest):
                     alt_sql = alt_guard.sql
                     alt_result = state["executor"].execute(alt_guard.sql)
                     agreement = validation.results_agree(result, alt_result)
-        except (anthropic.APIError, TypeError) as e:
+        except llm.LLMError as e:
             logger.warning("Multi-query validation skipped: %s", e)
 
     # ---- 6. Confidence --------------------------------------------------------

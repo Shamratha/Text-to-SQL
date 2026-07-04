@@ -167,7 +167,7 @@ def main() -> None:
         return
 
     print("\n" + "=" * 60)
-    print("LLM EVAL (uses the Anthropic API — costs a few cents)")
+    print("LLM EVAL (calls the configured LLM provider)")
     print("=" * 60)
     r = run_llm_cases(cases)
     print(f"  execution accuracy vs golden : {r['execution_accuracy']}")

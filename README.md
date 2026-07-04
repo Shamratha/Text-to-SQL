@@ -5,10 +5,17 @@ generates SQL with Claude, refuses to run anything destructive, verifies the
 query actually answers the question asked, and attaches an evidence-based
 confidence score to every result.
 
-**Eval results (offline guardrail suite): 8/8 dangerous queries blocked, 2/2
-row-limit transforms applied, 0 unsafe queries executed.** Run the full LLM
-eval (`python eval/run_eval.py`) to reproduce execution-accuracy numbers with
-your API key.
+**Measured eval results** (golden dataset, Groq `llama-3.3-70b-versatile`):
+
+| Metric | Result |
+|---|---|
+| Dangerous queries blocked | **8/8 (100%)** — zero unsafe queries executed |
+| Execution accuracy vs golden SQL | **12/14 (86%)** |
+| Generated queries that ran successfully | 16/16 |
+| Ambiguous / unanswerable questions correctly flagged | 4/4 |
+| Row-limit transforms applied | 2/2 |
+
+Reproduce with `python eval/run_eval.py` (full report in `eval/results/latest.json`).
 
 ## Why this is hard (and interesting)
 
@@ -30,7 +37,7 @@ kill it in the real world:
 
 ```
 question ──► schema-aware prompt (auto-introspected: tables, types, FKs, sample values)
-         ──► Claude (claude-sonnet-5, schema-validated structured output)
+         ──► LLM (Groq Llama 3.3 70B or Claude — schema-validated structured output)
          ──► ambiguity? ──► structured clarification request (multiple interpretations)
          ──► GUARDRAILS  block DDL/DML/file-reads/multi-statement/deep nesting,
          │               inject/clamp LIMIT, log every block
@@ -42,7 +49,7 @@ question ──► schema-aware prompt (auto-introspected: tables, types, FKs, s
 
 | Component | Choice |
 |---|---|
-| LLM | Claude `claude-sonnet-5` via the Anthropic SDK, structured outputs (`messages.parse` + Pydantic) |
+| LLM | Provider-abstracted: **Groq** `llama-3.3-70b-versatile` (free tier; JSON mode + Pydantic validation with repair retry) or **Claude** `claude-sonnet-5` (native structured outputs via `messages.parse`) — auto-detected from which key is in `.env` |
 | Database | DuckDB (real SQL engine w/ EXPLAIN; zero-setup, deploys anywhere) |
 | SQL analysis | sqlglot AST (statement whitelist, depth checks, LIMIT rewriting) |
 | API | FastAPI |
@@ -56,7 +63,8 @@ python -m venv .venv
 pip install -r requirements.txt
 
 python data/seed.py               # build the sample e-commerce warehouse (3k orders)
-copy .env.example .env            # then put your ANTHROPIC_API_KEY in .env
+copy .env.example .env            # then add a key: GROQ_API_KEY (free, console.groq.com)
+                                  # or ANTHROPIC_API_KEY — provider is auto-detected
 
 uvicorn app.main:app --port 8000
 # open http://localhost:8000
