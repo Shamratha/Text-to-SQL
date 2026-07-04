@@ -120,7 +120,13 @@ def _openai_structured(system: str, user: str, model_cls, max_tokens: int):
         except openai.APIStatusError as e:
             raise LLMError(f"{settings.llm_provider} error ({e.status_code}): {e}") from e
         except openai.APIConnectionError as e:
-            raise LLMError(f"Could not reach {settings.llm_provider} — check your network") from e
+            # Surface the underlying cause (DNS / SSL / timeout / blocked egress)
+            # so a deploy-environment network failure is diagnosable, not opaque.
+            cause = e.__cause__ or e
+            raise LLMError(
+                f"Could not reach {settings.llm_provider} at {settings.llm_base_url} "
+                f"({type(cause).__name__}: {cause})"
+            ) from e
 
         text = resp.choices[0].message.content or ""
         try:
