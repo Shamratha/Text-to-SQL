@@ -71,7 +71,10 @@ _base_url, _key_env, _default_model = _PROVIDER_DEFAULTS.get(
     settings.llm_provider, _PROVIDER_DEFAULTS["openai_compatible"]
 )
 settings.llm_base_url = os.getenv("LLM_BASE_URL", _base_url)
-settings.llm_api_key = os.getenv(_key_env, "")
+# .strip() defends against a trailing newline/space in the env var (a very common
+# copy-paste artifact in hosting dashboards) — an unstripped "\n" makes httpx
+# reject the Authorization header with LocalProtocolError.
+settings.llm_api_key = os.getenv(_key_env, "").strip()
 settings.model = os.getenv("TEXT2SQL_MODEL") or _default_model
 
 os.makedirs(settings.log_dir, exist_ok=True)

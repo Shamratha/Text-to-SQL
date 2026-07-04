@@ -7,10 +7,21 @@ Two providers, selected automatically from the environment (see config.py):
 """
 import json
 import os
+import re
 
 from pydantic import BaseModel, ValidationError
 
 from .config import settings
+
+_SECRET_RE = re.compile(r"(gsk_|sk-)[A-Za-z0-9\-_]{10,}")
+
+
+def _redact(text: str) -> str:
+    """Scrub API keys / bearer tokens from any string before it's surfaced or logged."""
+    scrubbed = _SECRET_RE.sub("***REDACTED***", text)
+    if settings.llm_api_key:
+        scrubbed = scrubbed.replace(settings.llm_api_key, "***REDACTED***")
+    return scrubbed
 
 
 class LLMError(Exception):
@@ -121,11 +132,12 @@ def _openai_structured(system: str, user: str, model_cls, max_tokens: int):
             raise LLMError(f"{settings.llm_provider} error ({e.status_code}): {e}") from e
         except openai.APIConnectionError as e:
             # Surface the underlying cause (DNS / SSL / timeout / blocked egress)
-            # so a deploy-environment network failure is diagnosable, not opaque.
+            # so a deploy-environment network failure is diagnosable — but redact
+            # any credential from the message first (the cause can echo the header).
             cause = e.__cause__ or e
             raise LLMError(
                 f"Could not reach {settings.llm_provider} at {settings.llm_base_url} "
-                f"({type(cause).__name__}: {cause})"
+                f"({type(cause).__name__}: {_redact(str(cause))})"
             ) from e
 
         text = resp.choices[0].message.content or ""
