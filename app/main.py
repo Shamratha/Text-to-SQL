@@ -28,10 +28,14 @@ state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Self-heal: seed the warehouse if it's missing (e.g. a fresh serverless /
+    # container instance where the build-time seed didn't persist). Deterministic,
+    # so every instance gets the identical dataset.
     if not os.path.exists(settings.db_path):
-        raise RuntimeError(
-            f"Database not found at {settings.db_path}. Run: python data/seed.py"
-        )
+        logger.info("Warehouse not found at %s — seeding now", settings.db_path)
+        from data.seed import main as seed_main
+        seed_main(settings.db_path)
+
     intro_con = duckdb.connect(settings.db_path, read_only=True)
     state["schema"] = extract_schema(intro_con)
     lo, hi = intro_con.execute("SELECT MIN(order_date), MAX(order_date) FROM orders").fetchone()

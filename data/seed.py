@@ -41,11 +41,12 @@ END = date(2026, 6, 30)
 DAYS = (END - START).days
 
 
-def main() -> None:
+def main(db_path: str = DB_PATH) -> None:
     rng = random.Random(42)
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    con = duckdb.connect(DB_PATH)
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    con = duckdb.connect(db_path)
 
     con.execute("""
         CREATE TABLE customers (
@@ -137,7 +138,7 @@ def main() -> None:
     con.executemany("INSERT INTO payments VALUES (?,?,?,?,?,?)", payments)
     con.close()
 
-    print(f"Seeded {DB_PATH}")
+    print(f"Seeded {db_path}")
     print(f"  customers: {len(customers)}, products: {len(products)}, "
           f"orders: {len(orders)}, order_items: {len(items)}, payments: {len(payments)}")
 
