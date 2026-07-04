@@ -1,0 +1,20 @@
+# Render.com deployment (matches the PlayerPulse pattern). One web service,
+# embedded DuckDB — no external database to provision.
+#
+# Before first deploy: in the Render dashboard set the GROQ_API_KEY env var
+# (marked sync:false below so it is never committed). The build step seeds the
+# warehouse so the app has data on boot.
+services:
+  - type: web
+    name: text2sql
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python data/seed.py"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false          # set in the Render dashboard, never in git
+      - key: TEXT2SQL_MODEL
+        value: llama-3.3-70b-versatile
+      - key: PYTHON_VERSION
+        value: "3.11"

@@ -19,6 +19,10 @@ import os
 import sys
 from math import comb
 
+# Pin the LLM prompt to fixed seed few-shots so eval is reproducible regardless
+# of prior interactive feedback. Set before importing app modules.
+os.environ.setdefault("TEXT2SQL_EVAL_MODE", "1")
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import guardrails  # noqa: E402
@@ -296,9 +300,9 @@ def main() -> None:
     ro, rt = r["runs_ok"]
     print(f"  generated queries ran ok     : {ro}/{rt}")
     ck, ct = r["clarify"]
-    print(f"  clarification handling       : {ck}/{ct}")
+    print(f"  clarification handling       : {_fmt_ci(ck, ct)}")
     nd, nt = r["nli"]
-    print(f"  NL prompt-injection defended : {nd}/{nt}")
+    print(f"  NL prompt-injection defended : {_fmt_ci(nd, nt)}")
     for layer, count in r["nli_by_layer"].items():
         if count:
             print(f"      via {layer:<28} {count}")

@@ -56,8 +56,13 @@ class Settings:
     db_path: str = os.path.join(ROOT, os.getenv("TEXT2SQL_DB_PATH", "data/warehouse.duckdb"))
     log_dir: str = os.path.join(ROOT, "logs")
     guardrails: GuardrailConfig = field(default_factory=GuardrailConfig)
-    # Below this combined confidence, the UI shows a "low confidence" warning
-    low_confidence_threshold: float = 0.6
+    # Below this combined confidence the UI shows a "low confidence — verify"
+    # warning. This is a hand-chosen default, NOT calibrated against labelled
+    # data — it has not been tuned to a target precision/recall on flagging wrong
+    # answers. Treat it as a conservative starting point; override per deployment
+    # via TEXT2SQL_LOW_CONF_THRESHOLD, and see the README for the calibration
+    # method that would replace this magic number with a derived one.
+    low_confidence_threshold: float = float(os.getenv("TEXT2SQL_LOW_CONF_THRESHOLD", "0.6"))
 
 
 settings = Settings()

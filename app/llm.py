@@ -173,6 +173,10 @@ _SEED_FEWSHOTS = [
 
 def _load_fewshots() -> list[dict]:
     examples = list(_SEED_FEWSHOTS)
+    # TEXT2SQL_EVAL_MODE pins the prompt to the fixed seed examples so eval runs
+    # are reproducible regardless of prior interactive 👍 feedback.
+    if os.getenv("TEXT2SQL_EVAL_MODE"):
+        return examples
     if os.path.exists(_FEWSHOT_PATH):
         try:
             with open(_FEWSHOT_PATH, encoding="utf-8") as f:
