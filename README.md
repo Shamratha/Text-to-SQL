@@ -1,7 +1,8 @@
 # Text2SQL — Natural Language SQL Interface with Guardrails & Hallucination Detection
 
 **▶ Live demo: https://text2sql-05z1.onrender.com** (free tier — first request
-after idle takes ~50s to wake).
+after idle takes ~50s to wake). The hosted demo runs Llama 3.1 8B for daily-quota
+headroom; Llama 3.3 70B is the primary model behind the eval numbers below.
 
 Ask questions in plain English against a real analytical database. The system
 generates SQL with an LLM (Groq Llama 3.3 70B free tier, or Claude), refuses to
