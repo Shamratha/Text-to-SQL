@@ -1,5 +1,8 @@
 # Text2SQL — Natural Language SQL Interface with Guardrails & Hallucination Detection
 
+**▶ Live demo: https://text2sql-05z1.onrender.com** (free tier — first request
+after idle takes ~50s to wake).
+
 Ask questions in plain English against a real analytical database. The system
 generates SQL with an LLM (Groq Llama 3.3 70B free tier, or Claude), refuses to
 run anything destructive, verifies the query actually answers the question
@@ -156,11 +159,10 @@ this deploys as a single web service. Config is included:
 - **Docker** — [`Dockerfile`](Dockerfile): `docker build -t text2sql . && docker
   run -p 8000:8000 -e GROQ_API_KEY=gsk_... text2sql`.
 
-**Status: deploy config is ready but no public instance is live yet.** The only
-blocker is supplying a hosting account + the `GROQ_API_KEY` secret — unlike a
-project needing a managed Postgres, there is no infrastructure to stand up here.
-This is a deliberate "ready to deploy, not yet deployed" state, not a limitation
-of the stack.
+**Live at https://text2sql-05z1.onrender.com** (Render free tier, deployed from
+`render.yaml`). Cold start ~50s after idle; the `GROQ_API_KEY` is set as a
+dashboard secret. The startup path self-seeds the warehouse if the build-time
+DB is absent, so a fresh instance can't crash-loop.
 
 ## The safety layer
 
