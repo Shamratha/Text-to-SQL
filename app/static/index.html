@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Text2SQL — NL query interface with guardrails</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --border: #2d3646;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950;
+    --amber: #d29922; --red: #f85149; --mono: "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; }
+  .layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; max-width: 1400px; margin: 0 auto; padding: 24px; }
+  header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+  header h1 { font-size: 22px; }
+  header h1 span { color: var(--accent); }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  .ask-row { display: flex; gap: 10px; }
+  #question { flex: 1; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 15px; }
+  #question:focus { outline: 1px solid var(--accent); }
+  button { background: var(--accent); color: #0d1117; font-weight: 600; border: 0; border-radius: 8px; padding: 0 22px; font-size: 14px; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: wait; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); padding: 6px 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  .chip:hover { color: var(--accent); border-color: var(--accent); }
+  label.toggle { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+  textarea#sqlbox { width: 100%; min-height: 90px; background: var(--panel2); color: #a5d6ff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: var(--mono); font-size: 13px; resize: vertical; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+  .badge.ok { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge.warn { background: rgba(210,153,34,.15); color: var(--amber); }
+  .badge.bad { background: rgba(248,81,73,.15); color: var(--red); }
+  .conf-wrap { display: flex; align-items: center; gap: 14px; margin: 10px 0; }
+  .conf-num { font-size: 34px; font-weight: 700; }
+  .conf-bars { flex: 1; }
+  .conf-bar { display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin: 3px 0; }
+  .conf-bar .track { background: var(--panel2); border-radius: 4px; height: 8px; overflow: hidden; }
+  .conf-bar .fill { height: 100%; border-radius: 4px; background: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--accent); cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
+  .table-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .warn-list li { color: var(--amber); font-size: 13px; margin: 4px 0 4px 18px; }
+  .viol-list li { color: var(--red); font-size: 13px; margin: 4px 0 4px 18px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .hist-item { border-bottom: 1px solid var(--border); padding: 10px 4px; cursor: pointer; }
+  .hist-item:hover { background: var(--panel2); }
+  .hist-q { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .fb { display: flex; gap: 8px; margin-top: 12px; }
+  .spinner { display: none; color: var(--muted); font-size: 13px; margin-top: 10px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin: 8px 0; }
+  pre { background: var(--panel2); border-radius: 8px; padding: 12px; font-size: 12px; overflow-x: auto; color: var(--muted); font-family: var(--mono); }
+  .interp { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
+  .interp:hover { border-color: var(--accent); }
+  .interp code { font-family: var(--mono); font-size: 12px; color: #a5d6ff; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <header>
+    <h1>Text<span>2</span>SQL</h1>
+    <div class="sub">natural language &rarr; guarded SQL &rarr; validated answers &middot; e-commerce warehouse (DuckDB)</div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="ask-row">
+        <input id="question" placeholder="Ask anything about customers, products, orders, payments…"
+               onkeydown="if(event.key==='Enter')ask()">
+        <button id="askBtn" onclick="ask()">Ask</button>
+      </div>
+      <div class="chips" id="chips"></div>
+      <label class="toggle"><input type="checkbox" id="deepValidate" checked>
+        Deep validation (generate a second independent query and compare results)</label>
+      <div class="spinner" id="spinner">⏳ Generating SQL, running guardrails &amp; validation…</div>
+    </div>
+
+    <div id="output"></div>
+  </main>
+
+  <aside>
+    <div class="card">
+      <div class="section-title">History</div>
+      <div id="history" class="muted">No queries yet.</div>
+    </div>
+    <div class="card">
+      <div class="section-title">Schema</div>
+      <div id="schema" class="muted">Loading…</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const EXAMPLES = [
+  "Top 5 products by revenue in 2025",
+  "Monthly revenue trend for completed orders",
+  "Which country has the highest average order value?",
+  "Cancellation rate by sales channel",
+  "How many enterprise customers made a purchase last quarter of 2025?",
+  "DROP TABLE customers"  // guardrail demo
+];
+let lastRecord = null;
+
+function el(html) { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function init() {
+  const chips = document.getElementById('chips');
+  EXAMPLES.forEach(q => {
+    const c = el(`<span class="chip">${esc(q)}</span>`);
+    c.onclick = () => { document.getElementById('question').value = q; ask(); };
+    chips.appendChild(c);
+  });
+  loadSchema(); loadHistory();
+}
+
+async function loadSchema() {
+  const r = await fetch('/v1/schema').then(r => r.json());
+  const div = document.getElementById('schema');
+  div.innerHTML = '';
+  div.appendChild(el(`<div class="muted" style="margin-bottom:8px">data: ${esc(r.date_range[0])} → ${esc(r.date_range[1])}</div>`));
+  for (const [name, t] of Object.entries(r.tables)) {
+    const cols = t.columns.map(c => c.name).join(', ');
+    div.appendChild(el(`<details><summary><b>${esc(name)}</b> (${t.row_count})</summary><pre>${esc(cols)}</pre></details>`));
+  }
+}
+
+async function loadHistory() {
+  const r = await fetch('/v1/history').then(r => r.json());
+  const div = document.getElementById('history');
+  if (!r.queries.length) { div.textContent = 'No queries yet.'; return; }
+  div.innerHTML = '';
+  r.queries.forEach(q => {
+    const badge = q.status === 'ok' ? `conf ${(q.confidence*100).toFixed(0)}%` : q.status;
+    const item = el(`<div class="hist-item"><div class="hist-q">${esc(q.question)}</div>
+      <div class="hist-meta">${esc(badge)} · ${new Date(q.ts*1000).toLocaleTimeString()}</div></div>`);
+    item.onclick = () => render(q);
+    div.appendChild(item);
+  });
+}
+
+async function ask() {
+  const q = document.getElementById('question').value.trim();
+  if (!q) return;
+  setBusy(true);
+  try {
+    const r = await fetch('/v1/query', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q, deep_validate: document.getElementById('deepValidate').checked})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || r.statusText);
+    render(data); loadHistory();
+  } catch (e) {
+    document.getElementById('output').innerHTML =
+      `<div class="card"><span class="badge bad">error</span><p class="muted" style="margin-top:8px">${esc(e.message)}</p></div>`;
+  } finally { setBusy(false); }
+}
+
+function setBusy(b) {
+  document.getElementById('askBtn').disabled = b;
+  document.getElementById('spinner').style.display = b ? 'block' : 'none';
+}
+
+function render(rec) {
+  lastRecord = rec;
+  const out = document.getElementById('output');
+  out.innerHTML = '';
+
+  if (rec.status === 'clarification') {
+    const card = el(`<div class="card"><span class="badge warn">needs clarification</span>
+      <p style="margin:10px 0" class="muted">${esc(rec.explanation)}</p><div id="interps"></div></div>`);
+    out.appendChild(card);
+    const box = card.querySelector('#interps');
+    (rec.interpretations || []).forEach(i => {
+      const d = el(`<div class="interp"><div>${esc(i.description)}</div><code>${esc(i.example_sql)}</code></div>`);
+      d.onclick = () => runRaw(i.example_sql);
+      box.appendChild(d);
+    });
+    return;
+  }
+
+  if (rec.status === 'blocked') {
+    out.appendChild(el(`<div class="card"><span class="badge bad">blocked by guardrails</span>
+      <ul class="viol-list">${rec.violations.map(v => `<li>${esc(v)}</li>`).join('')}</ul>
+      <pre>${esc(rec.sql)}</pre></div>`));
+    return;
+  }
+
+  if (rec.status === 'error') {
+    out.appendChild(el(`<div class="card"><span class="badge bad">execution error</span>
+      <p class="muted" style="margin-top:8px">${esc(rec.error)}</p><pre>${esc(rec.sql)}</pre></div>`));
+    return;
+  }
+
+  // ---- confidence card ----
+  const conf = rec.confidence ?? 0;
+  const color = conf >= 0.75 ? 'var(--green)' : conf >= 0.6 ? 'var(--amber)' : 'var(--red)';
+  const labels = { model_confidence: 'model self-report', alignment: 'back-translation',
+                   sanity: 'result sanity', agreement: 'multi-query match', schema_coverage: 'schema coverage' };
+  let bars = '';
+  for (const [k, v] of Object.entries(rec.confidence_breakdown || {})) {
+    const val = v.included ? v.value : null;
+    bars += `<div class="conf-bar"><span>${labels[k] || k}</span>
+      <div class="track"><div class="fill" style="width:${val === null ? 0 : val*100}%;
+        background:${val === null ? 'transparent' : 'var(--accent)'}"></div></div>
+      <span>${val === null ? 'skip' : (val*100).toFixed(0) + '%'}</span></div>`;
+  }
+  out.appendChild(el(`<div class="card">
+    <span class="badge ${conf >= 0.75 ? 'ok' : conf >= 0.6 ? 'warn' : 'bad'}">
+      ${rec.low_confidence ? 'low confidence — verify before trusting' : 'confidence'}</span>
+    <div class="conf-wrap"><div class="conf-num" style="color:${color}">${(conf*100).toFixed(0)}%</div>
+    <div class="conf-bars">${bars}</div></div>
+    ${rec.agreement === false ? '<p class="warn-list" style="color:var(--amber);font-size:13px">⚠ Two independent query strategies returned different results — see alternative SQL below.</p>' : ''}
+    </div>`));
+
+  // ---- SQL card (editable) ----
+  const sqlCard = el(`<div class="card"><div class="section-title">Generated SQL (editable)</div>
+    <textarea id="sqlbox">${esc(rec.sql)}</textarea>
+    <div class="fb"><button class="ghost" onclick="runRaw(document.getElementById('sqlbox').value)">Run edited SQL</button></div>
+    <p class="muted" style="margin-top:10px">${esc(rec.explanation || '')}</p>
+    ${(rec.guardrail_notes || []).map(n => `<p class="muted">🛡 ${esc(n)}</p>`).join('')}
+    ${rec.back_translated_question ? `<details><summary>Hallucination check: SQL back-translated</summary>
+      <pre>"${esc(rec.back_translated_question)}"\n\n${esc(rec.alignment_reasoning || '')}</pre></details>` : ''}
+    ${rec.alternative_sql ? `<details><summary>Alternative strategy (multi-query validation)</summary>
+      <pre>${esc(rec.alternative_sql)}</pre></details>` : ''}
+    ${rec.explain_plan ? `<details><summary>EXPLAIN plan</summary><pre>${esc(rec.explain_plan)}</pre></details>` : ''}
+    </div>`);
+  out.appendChild(sqlCard);
+
+  // ---- warnings ----
+  const warns = [...(rec.sanity_warnings || []), ...(rec.coverage_problems || [])];
+  if (warns.length) {
+    out.appendChild(el(`<div class="card"><div class="section-title">Warnings</div>
+      <ul class="warn-list">${warns.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`));
+  }
+
+  // ---- results ----
+  out.appendChild(renderTable(rec));
+
+  // ---- feedback ----
+  if (rec.query_id) {
+    const fb = el(`<div class="card"><div class="section-title">Was this correct?</div>
+      <div class="fb"><button class="ghost" id="fbUp">👍 Correct</button>
+      <button class="ghost" id="fbDown">👎 Wrong</button><span class="muted" id="fbMsg"></span></div></div>`);
+    fb.querySelector('#fbUp').onclick = () => sendFeedback(rec.query_id, true, fb);
+    fb.querySelector('#fbDown').onclick = () => sendFeedback(rec.query_id, false, fb);
+    out.appendChild(fb);
+  }
+}
+
+function renderTable(rec) {
+  if (!rec.columns || !rec.columns.length) return el(`<div class="card muted">No result columns.</div>`);
+  const head = rec.columns.map((c, i) => `<th onclick="sortTable(${i})">${esc(c)} ⇅</th>`).join('');
+  const body = rec.rows.map(r => `<tr>${r.map(v => `<td>${esc(fmt(v))}</td>`).join('')}</tr>`).join('');
+  return el(`<div class="card"><div class="section-title">Results — ${rec.row_count} row(s) · ${rec.elapsed_ms} ms</div>
+    <div class="table-scroll"><table id="resultTable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`);
+}
+
+function fmt(v) {
+  if (typeof v === 'number' && !Number.isInteger(v)) return v.toFixed(2);
+  return v;
+}
+
+let sortState = {};
+function sortTable(i) {
+  const tbody = document.querySelector('#resultTable tbody');
+  const rows = [...tbody.rows];
+  const dir = sortState[i] = -(sortState[i] || -1);
+  rows.sort((a, b) => {
+    const x = a.cells[i].textContent, y = b.cells[i].textContent;
+    const nx = parseFloat(x), ny = parseFloat(y);
+    if (!isNaN(nx) && !isNaN(ny)) return (nx - ny) * dir;
+    return x.localeCompare(y) * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+async function runRaw(sql) {
+  setBusy(true);
+  try {
+    const r = await fetch('/v1/execute', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sql})
+    });
+    const data = await r.json();
+    if (data.status === 'blocked') { render({...data, question: '(raw SQL)'}); return; }
+    if (data.status === 'error') { render({...data, question: '(raw SQL)'}); return; }
+    const out = document.getElementById('output');
+    out.innerHTML = '';
+    out.appendChild(el(`<div class="card"><span class="badge ok">raw SQL executed</span>
+      ${(data.guardrail_notes || []).map(n => `<p class="muted">🛡 ${esc(n)}</p>`).join('')}
+      <pre>${esc(data.sql)}</pre></div>`));
+    out.appendChild(renderTable(data));
+  } finally { setBusy(false); }
+}
+
+async function sendFeedback(id, correct, card) {
+  await fetch('/v1/feedback', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({query_id: id, correct})
+  });
+  card.querySelector('#fbMsg').textContent = correct
+    ? 'Saved — this becomes a few-shot example for future queries.'
+    : 'Saved — logged as an eval candidate.';
+}
+
+init();
+</script>
+</body>
+</html>

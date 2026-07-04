@@ -1,0 +1,201 @@
+{
+  "description": "Golden query dataset. expect: ok = should generate+execute matching golden_sql results; blocked = guardrails must block sql_input; clarify = should ask for clarification or state unanswerable; ok_noglod = should execute successfully (no golden result comparison).",
+  "cases": [
+    {
+      "id": "simple-count-customers",
+      "category": "simple lookup",
+      "expect": "ok",
+      "question": "How many customers do we have?",
+      "golden_sql": "SELECT COUNT(*) FROM customers"
+    },
+    {
+      "id": "simple-count-products",
+      "category": "simple lookup",
+      "expect": "ok",
+      "question": "How many products are in the catalog?",
+      "golden_sql": "SELECT COUNT(*) FROM products"
+    },
+    {
+      "id": "simple-max-price",
+      "category": "simple lookup",
+      "expect": "ok",
+      "question": "What is the most expensive product's price?",
+      "golden_sql": "SELECT MAX(price) FROM products"
+    },
+    {
+      "id": "filter-country-count",
+      "category": "filter",
+      "expect": "ok",
+      "question": "How many customers are from Japan?",
+      "golden_sql": "SELECT COUNT(*) FROM customers WHERE country = 'Japan'"
+    },
+    {
+      "id": "filter-signup-2025",
+      "category": "date filter",
+      "expect": "ok",
+      "question": "How many customers signed up during 2025?",
+      "golden_sql": "SELECT COUNT(*) FROM customers WHERE signup_date >= '2025-01-01' AND signup_date <= '2025-12-31'"
+    },
+    {
+      "id": "agg-orders-by-status",
+      "category": "group by",
+      "expect": "ok",
+      "question": "How many orders are there in each status?",
+      "golden_sql": "SELECT status, COUNT(*) FROM orders GROUP BY status"
+    },
+    {
+      "id": "agg-avg-payment-method",
+      "category": "group by",
+      "expect": "ok",
+      "question": "What is the average payment amount for each payment method?",
+      "golden_sql": "SELECT method, AVG(amount) FROM payments GROUP BY method"
+    },
+    {
+      "id": "join-orders-per-country",
+      "category": "join + group by",
+      "expect": "ok",
+      "question": "How many orders were placed by customers in each country?",
+      "golden_sql": "SELECT c.country, COUNT(*) FROM orders o JOIN customers c ON c.customer_id = o.customer_id GROUP BY c.country"
+    },
+    {
+      "id": "join-top5-products-revenue",
+      "category": "join + aggregation",
+      "expect": "ok",
+      "question": "Which 5 products generated the most revenue? Show product name and revenue.",
+      "golden_sql": "SELECT p.name, SUM(oi.quantity * oi.unit_price * (1 - oi.discount)) AS revenue FROM order_items oi JOIN products p ON p.product_id = oi.product_id GROUP BY p.name ORDER BY revenue DESC LIMIT 5"
+    },
+    {
+      "id": "join-category-units",
+      "category": "join + aggregation",
+      "expect": "ok",
+      "question": "Total units sold per product category, highest first",
+      "golden_sql": "SELECT p.category, SUM(oi.quantity) AS units FROM order_items oi JOIN products p ON p.product_id = oi.product_id GROUP BY p.category ORDER BY units DESC"
+    },
+    {
+      "id": "daterange-orders-q1-2025",
+      "category": "date range",
+      "expect": "ok",
+      "question": "How many orders were placed in the first quarter of 2025?",
+      "golden_sql": "SELECT COUNT(*) FROM orders WHERE order_date >= '2025-01-01' AND order_date <= '2025-03-31'"
+    },
+    {
+      "id": "multi-join-enterprise-revenue",
+      "category": "multi-table join",
+      "expect": "ok",
+      "question": "Total payment amount captured from enterprise segment customers",
+      "golden_sql": "SELECT SUM(p.amount) FROM payments p JOIN orders o ON o.order_id = p.order_id JOIN customers c ON c.customer_id = o.customer_id WHERE c.segment = 'enterprise' AND p.status = 'captured'"
+    },
+    {
+      "id": "rate-cancelled-by-channel",
+      "category": "derived metric",
+      "expect": "ok",
+      "question": "What percentage of orders were cancelled for each sales channel?",
+      "golden_sql": "SELECT channel, 100.0 * COUNT(*) FILTER (WHERE status = 'cancelled') / COUNT(*) AS pct FROM orders GROUP BY channel"
+    },
+    {
+      "id": "having-repeat-buyers",
+      "category": "having",
+      "expect": "ok",
+      "question": "How many customers placed more than 10 orders?",
+      "golden_sql": "SELECT COUNT(*) FROM (SELECT customer_id FROM orders GROUP BY customer_id HAVING COUNT(*) > 10) t"
+    },
+    {
+      "id": "trend-monthly-2025-revenue",
+      "category": "time series",
+      "expect": "ok_nogold",
+      "question": "Show monthly revenue from captured payments during 2025"
+    },
+    {
+      "id": "open-best-customers",
+      "category": "open-ended",
+      "expect": "ok_nogold",
+      "question": "Who are our top 10 customers by total spend?"
+    },
+    {
+      "id": "ambiguous-revenue",
+      "category": "ambiguous",
+      "expect": "clarify_or_ok",
+      "question": "What is our revenue?"
+    },
+    {
+      "id": "ambiguous-best-product",
+      "category": "ambiguous",
+      "expect": "clarify_or_ok",
+      "question": "What is the best product?"
+    },
+    {
+      "id": "unanswerable-employees",
+      "category": "unanswerable",
+      "expect": "clarify",
+      "question": "What is the average salary of our employees?"
+    },
+    {
+      "id": "unanswerable-website-traffic",
+      "category": "unanswerable",
+      "expect": "clarify",
+      "question": "How many visitors did the website get last week?"
+    },
+    {
+      "id": "guardrail-drop",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "DROP TABLE customers"
+    },
+    {
+      "id": "guardrail-delete",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "DELETE FROM orders WHERE order_id = 1"
+    },
+    {
+      "id": "guardrail-update",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "UPDATE products SET price = 0"
+    },
+    {
+      "id": "guardrail-insert",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "INSERT INTO customers VALUES (9999, 'x', 'x@x.com', 'India', 'consumer', '2025-01-01')"
+    },
+    {
+      "id": "guardrail-create",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "CREATE TABLE evil AS SELECT * FROM customers"
+    },
+    {
+      "id": "guardrail-multi-statement",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "SELECT 1; DROP TABLE customers"
+    },
+    {
+      "id": "guardrail-file-read",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "SELECT * FROM read_csv('C:/Windows/win.ini')"
+    },
+    {
+      "id": "guardrail-deep-nesting",
+      "category": "guardrail",
+      "expect": "blocked",
+      "sql_input": "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM customers) a) b) c"
+    },
+    {
+      "id": "guardrail-limit-injected",
+      "category": "guardrail",
+      "expect": "ok_transformed",
+      "sql_input": "SELECT * FROM orders",
+      "expect_note_contains": "LIMIT 1000 injected"
+    },
+    {
+      "id": "guardrail-limit-clamped",
+      "category": "guardrail",
+      "expect": "ok_transformed",
+      "sql_input": "SELECT * FROM orders LIMIT 999999",
+      "expect_note_contains": "clamped"
+    }
+  ]
+}

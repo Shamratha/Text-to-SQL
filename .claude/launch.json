@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "text2sql",
+      "runtimeExecutable": "D:\\text2sql\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000"],
+      "cwd": "D:\\text2sql",
+      "port": 8000
+    }
+  ]
+}
