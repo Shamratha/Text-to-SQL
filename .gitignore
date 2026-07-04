@@ -6,3 +6,6 @@ logs/
 data/warehouse.duckdb
 .pytest_cache/
 eval/results/
+
+.coverage
+.pytest_cache/
